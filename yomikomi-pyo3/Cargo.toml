@@ -1,7 +1,12 @@
 [package]
 name = "yomikomi-pyo3"
-version = "0.1.4"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
 
 [lib]
 name = "yomikomi"
@@ -10,4 +15,4 @@ crate-type = ["cdylib"]
 [dependencies]
 numpy = "0.22.0"
 pyo3 = "0.22.0"
-yomikomi = { path = "../yomikomi" }
+yomikomi = { path = "../yomikomi", version = "0.2.0" }

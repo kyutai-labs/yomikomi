@@ -4,3 +4,12 @@ members = [
   "yomikomi-pyo3",
 ]
 resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+description = "Dataloader for training large text models."
+repository = "https://github.com/kyutai-labs/yomikomi"
+keywords = ["tensor", "machine-learning"]
+categories = ["science"]
+license = "MIT OR Apache-2.0"
