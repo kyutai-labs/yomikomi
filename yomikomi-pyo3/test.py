@@ -136,7 +136,7 @@ for v in yk.stream([1, 2, np.array([1, 2, 3, 4, 5])], field="foo").key_transform
 for v in yk.stream([1, 2, np.array([1, 2, 3, 4, 5])], field="foo"):
     print(v)
 for v in (
-    yk.stream(range(42), field="foo")
+    yk.stream([[i] for i in range(42)], field="foo")
     .sliding_window(7, field="foo", overlap_over_samples=True)
     .batch(2)
     .enumerate("idx")
