@@ -1,0 +1,13 @@
+[package]
+name = "yomikomi-pyo3"
+version = "0.1.4"
+edition = "2021"
+
+[lib]
+name = "yomikomi"
+crate-type = ["cdylib"]
+
+[dependencies]
+numpy = "0.20.0"
+pyo3 = "0.20.0"
+yomikomi = { path = "../yomikomi" }

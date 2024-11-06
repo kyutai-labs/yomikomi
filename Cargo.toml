@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "yomikomi",
+  "yomikomi-pyo3",
+]
+resolver = "2"
