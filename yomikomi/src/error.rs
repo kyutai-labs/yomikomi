@@ -46,6 +46,9 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[error(transparent)]
+    Tokenizers(#[from] tokenizers::tokenizer::Error),
+
     /// Arbitrary errors wrapping.
     #[error(transparent)]
     Wrapped(Box<dyn std::error::Error + Send + Sync>),

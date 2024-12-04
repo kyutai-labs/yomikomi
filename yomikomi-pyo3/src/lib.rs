@@ -214,6 +214,8 @@ struct Tokenize {
     report_bpb: bool,
     include_bos: bool,
     include_eos: bool,
+    bos_id: Option<u32>,
+    eos_id: Option<u32>,
 }
 
 impl Iterable for Tokenize {
@@ -227,6 +229,8 @@ impl Iterable for Tokenize {
             self.report_bpb,
             self.include_bos,
             self.include_eos,
+            self.bos_id,
+            self.eos_id,
         )
         .map_err(w)?;
         Ok(StreamIter { stream: Box::new(stream) })
@@ -409,7 +413,8 @@ impl YkIterable {
 
     /// Loads a sentencepiece tokenizer, and use it to tokenize the field passed as an argument of
     /// this function.
-    #[pyo3(signature = (path, *, in_field="text".to_string(), out_field=None, report_bpb=true, include_bos=true, include_eos=false))]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (path, *, in_field="text".to_string(), out_field=None, report_bpb=true, include_bos=true, include_eos=false, bos_id=None, eos_id=None))]
     fn tokenize(
         &self,
         path: std::path::PathBuf,
@@ -418,6 +423,8 @@ impl YkIterable {
         report_bpb: bool,
         include_bos: bool,
         include_eos: bool,
+        bos_id: Option<u32>,
+        eos_id: Option<u32>,
     ) -> PyResult<Self> {
         let out_field = out_field.unwrap_or_else(|| in_field.clone());
         let inner = Tokenize {
@@ -428,6 +435,8 @@ impl YkIterable {
             report_bpb,
             include_bos,
             include_eos,
+            bos_id,
+            eos_id,
         };
         Ok(Self { inner: Arc::new(inner) })
     }
