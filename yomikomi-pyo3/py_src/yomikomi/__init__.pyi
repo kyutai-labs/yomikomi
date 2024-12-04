@@ -103,7 +103,18 @@ class YkIterable:
         """ """
         pass
 
-    def tokenize(self, path, *, in_field=..., out_field=None, report_bpb=True, include_bos=True, include_eos=False):
+    def tokenize(
+        self,
+        path,
+        *,
+        in_field=...,
+        out_field=None,
+        report_bpb=True,
+        include_bos=True,
+        include_eos=False,
+        bos_id=None,
+        eos_id=None
+    ):
         """
         Loads a sentencepiece tokenizer, and use it to tokenize the field passed as an argument of
         this function.
