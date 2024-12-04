@@ -15,4 +15,4 @@ crate-type = ["cdylib"]
 [dependencies]
 numpy = "0.22.0"
 pyo3 = "0.22.0"
-yomikomi = { path = "../yomikomi", version = "0.2.0" }
+yomikomi = { path = "../yomikomi", version = "0.3.0" }
