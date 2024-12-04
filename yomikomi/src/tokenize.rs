@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokenizers::tokenizer::Tokenizer;
 
 enum Processor {
-    Tokenizers { inner: Tokenizer, bos_id: Option<u32>, eos_id: Option<u32> },
+    Tokenizers { inner: Box<Tokenizer>, bos_id: Option<u32>, eos_id: Option<u32> },
     SentencePiece(SentencePieceProcessor),
 }
 
@@ -59,7 +59,7 @@ impl<T> Tokenize<T> {
     ) -> Result<Self> {
         let path = path.as_ref();
         let processor = if path.extension().map_or(false, |v| v == "json") {
-            let inner = Tokenizer::from_file(path)?;
+            let inner = Box::new(Tokenizer::from_file(path)?);
             Processor::Tokenizers { inner, bos_id: None, eos_id: None }
         } else {
             Processor::SentencePiece(SentencePieceProcessor::open(path).map_err(E::wrap)?)
