@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokenizers::tokenizer::Tokenizer;
 
 enum Processor {
-    Tokenizers { inner: Box<Tokenizer>, bos_id: Option<u32>, eos_id: Option<u32> },
+    Tokenizers(Box<Tokenizer>),
     SentencePiece(SentencePieceProcessor),
 }
 
@@ -12,14 +12,14 @@ impl Processor {
     fn bos_id(&self) -> Option<u32> {
         match self {
             Self::SentencePiece(p) => p.bos_id(),
-            Self::Tokenizers { inner: _, bos_id, eos_id: _ } => bos_id.as_ref().copied(),
+            Self::Tokenizers(_) => None,
         }
     }
 
     fn eos_id(&self) -> Option<u32> {
         match self {
             Self::SentencePiece(p) => p.eos_id(),
-            Self::Tokenizers { inner: _, bos_id: _, eos_id } => eos_id.as_ref().copied(),
+            Self::Tokenizers(_) => None,
         }
     }
 
@@ -28,9 +28,7 @@ impl Processor {
             Self::SentencePiece(p) => {
                 p.encode(str).map_err(E::wrap)?.iter().map(|v| v.id).collect()
             }
-            Self::Tokenizers { inner, bos_id: _, eos_id: _ } => {
-                inner.encode(str, false)?.get_ids().to_vec()
-            }
+            Self::Tokenizers(p) => p.encode(str, false)?.get_ids().to_vec(),
         };
         Ok(tokens)
     }
@@ -45,9 +43,12 @@ pub struct Tokenize<T> {
     tokens_and_chars: Option<Mutex<(usize, usize)>>,
     include_bos: bool,
     include_eos: bool,
+    bos_id: Option<u32>,
+    eos_id: Option<u32>,
 }
 
 impl<T> Tokenize<T> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<P: AsRef<std::path::Path>>(
         path: P,
         input: T,
@@ -56,11 +57,13 @@ impl<T> Tokenize<T> {
         report_bpb: bool,
         include_bos: bool,
         include_eos: bool,
+        bos_id: Option<u32>,
+        eos_id: Option<u32>,
     ) -> Result<Self> {
         let path = path.as_ref();
         let processor = if path.extension().map_or(false, |v| v == "json") {
             let inner = Box::new(Tokenizer::from_file(path)?);
-            Processor::Tokenizers { inner, bos_id: None, eos_id: None }
+            Processor::Tokenizers(inner)
         } else {
             Processor::SentencePiece(SentencePieceProcessor::open(path).map_err(E::wrap)?)
         };
@@ -78,6 +81,8 @@ impl<T> Tokenize<T> {
             tokens_and_chars,
             include_bos,
             include_eos,
+            bos_id,
+            eos_id,
         })
     }
 }
@@ -102,7 +107,8 @@ impl<T: Stream> Stream for Tokenize<T> {
         let text = String::from_utf8_lossy(values);
         let mut all_tokens = Vec::new();
         if self.include_bos {
-            if let Some(bos_id) = self.processor.bos_id() {
+            let bos_id = self.bos_id.or_else(|| self.processor.bos_id());
+            if let Some(bos_id) = bos_id {
                 all_tokens.push(bos_id)
             }
         }
@@ -130,7 +136,8 @@ impl<T: Stream> Stream for Tokenize<T> {
             }
         }
         if self.include_eos {
-            if let Some(eos_id) = self.processor.eos_id() {
+            let eos_id = self.eos_id.or_else(|| self.processor.eos_id());
+            if let Some(eos_id) = eos_id {
                 all_tokens.push(eos_id)
             }
         }
