@@ -37,9 +37,9 @@ jobs:
           sccache: 'true'
           manylinux: auto
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-linux-${{ matrix.platform.target }}
           path: dist
 
   macos:
@@ -59,9 +59,9 @@ jobs:
           args: --release --out dist --find-interpreter --manifest-path yomikomi-pyo3/Cargo.toml
           sccache: 'true'
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-macos-${{ matrix.platform.target }}
           path: dist
 
   sdist:
@@ -74,9 +74,9 @@ jobs:
           command: sdist
           args: --out dist --manifest-path yomikomi-pyo3/Cargo.toml
       - name: Upload sdist
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-sdist
           path: dist
 
   release:
@@ -87,7 +87,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: wheels
       - name: Publish to PyPI
