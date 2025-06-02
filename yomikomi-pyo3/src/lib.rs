@@ -261,6 +261,22 @@ impl Iterable for SlidingWindow {
     }
 }
 
+struct FirstSlice {
+    inner: Arc<dyn Iterable + 'static + Send + Sync>,
+    field: String,
+    window_size: usize,
+}
+
+impl Iterable for FirstSlice {
+    fn iter(&self) -> PyResult<StreamIter> {
+        let inner = self.inner.iter()?.stream;
+        let stream =
+            yk::sliding_window::FirstSlice::new(inner, self.window_size, self.field.clone())
+                .map_err(w)?;
+        Ok(StreamIter { stream: Box::new(stream) })
+    }
+}
+
 struct Batch {
     inner: Arc<dyn Iterable + 'static + Send + Sync>,
     batch_size: usize,
@@ -463,6 +479,12 @@ impl YkIterable {
             window_size,
             overlap_over_samples,
         };
+        Ok(Self { inner: Arc::new(inner) })
+    }
+
+    #[pyo3(signature = (window_size, *, field="text".to_string()))]
+    fn first_slice(&self, window_size: usize, field: String) -> PyResult<Self> {
+        let inner = FirstSlice { inner: self.inner.clone(), field, window_size };
         Ok(Self { inner: Arc::new(inner) })
     }
 
