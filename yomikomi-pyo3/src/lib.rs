@@ -1,6 +1,6 @@
 #![allow(clippy::useless_conversion)]
 use numpy::prelude::*;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, BoundObject};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -331,7 +331,7 @@ struct StreamIter {
 }
 
 fn array_to_py<'a>(v: &Array, py: Python<'a>) -> Result<Bound<'a, PyAny>> {
-    fn to_vec<'a, T: WithDType + numpy::Element>(
+    fn to_vec<'a, T: WithDType + numpy::Element + IntoPyObject<'a>>(
         v: &Array,
         py: Python<'a>,
     ) -> Result<Bound<'a, PyAny>> {
@@ -339,7 +339,8 @@ fn array_to_py<'a>(v: &Array, py: Python<'a>) -> Result<Bound<'a, PyAny>> {
             0 => {
                 // Return scalar values using the built-in types rather than through a num
                 let v = v.to_vec0::<T>()?;
-                todo!()
+                let obj = v.into_pyobject(py).map_err(|e| Error::wrap(e.into()))?;
+                pyo3::BoundObject::into_any(obj).into_bound()
             }
             1 => {
                 let v = v.to_vec1::<T>()?;
