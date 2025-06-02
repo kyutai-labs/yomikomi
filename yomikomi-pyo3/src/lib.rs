@@ -1,3 +1,4 @@
+#![allow(clippy::useless_conversion)]
 use numpy::prelude::*;
 use pyo3::prelude::*;
 use std::collections::HashMap;

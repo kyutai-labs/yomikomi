@@ -137,3 +137,49 @@ impl<T: Stream> Stream for SlidingWindow<T> {
         }
     }
 }
+
+pub struct FirstSlice<T> {
+    input: T,
+    buffers: Mutex<Buffers>,
+    key: String,
+    window_size: usize,
+}
+
+impl<T> FirstSlice<T> {
+    pub fn new(input: T, window_size: usize, key: String) -> Result<Self> {
+        if window_size == 0 {
+            crate::bail!("window_size cannot be 0 in FirstSlice");
+        };
+        let buffers =
+            Buffers { samples: VecDeque::new(), arrays: Vec::new(), total_len_in_arrays: 0 };
+        let s = Self { input, buffers: Mutex::new(buffers), key, window_size };
+        Ok(s)
+    }
+}
+
+impl<T: Stream> Stream for FirstSlice<T> {
+    fn next(&self) -> Result<Option<crate::Sample>> {
+        loop {
+            {
+                let mut buffers = self.buffers.lock()?;
+                if let Some(sample) = buffers.samples.pop_front() {
+                    return Ok(Some(sample));
+                }
+            }
+            let sample = match self.input.next()? {
+                None => return Ok(None),
+                Some(sample) => sample,
+            };
+            let array = match sample.get(self.key.as_str()) {
+                None => crate::bail!("no key {} in FirstSlice", self.key),
+                Some(array) => array,
+            };
+            let size = array.shape().dims1()?;
+            let mut buffers = self.buffers.lock()?;
+            let mut new_sample = sample.clone();
+            let sub_array = array.narrow(0, 0, self.window_size)?;
+            new_sample.insert(self.key.to_string(), sub_array);
+            buffers.samples.push_back(new_sample);
+        }
+    }
+}

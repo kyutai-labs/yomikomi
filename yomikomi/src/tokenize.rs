@@ -61,7 +61,7 @@ impl<T> Tokenize<T> {
         eos_id: Option<u32>,
     ) -> Result<Self> {
         let path = path.as_ref();
-        let processor = if path.extension().map_or(false, |v| v == "json") {
+        let processor = if path.extension().is_some_and(|v| v == "json") {
             let inner = Box::new(Tokenizer::from_file(path)?);
             Processor::Tokenizers(inner)
         } else {
