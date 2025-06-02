@@ -112,6 +112,12 @@ impl Array {
         self.layout.strided_blocks()
     }
 
+    pub fn zeros<S: Into<Shape>>(s: S, dtype: DType) -> Self {
+        let shape = s.into();
+        let storage = Storage::zeros(shape.elem_count(), dtype);
+        Self { storage: Arc::new(storage), layout: Layout::contiguous(shape) }
+    }
+
     pub fn reshape<S: Into<Shape>>(&self, s: S) -> Result<Self> {
         let shape = s.into();
         if shape.elem_count() != self.elem_count() {
@@ -277,6 +283,29 @@ impl Array {
             arg.storage().copy_strided_src(&mut storage, offset, arg.layout())?;
         }
         Ok(Self { storage: Arc::new(storage), layout: Layout::contiguous(shape) })
+    }
+
+    pub fn pad_with_zeros(&self, dim: usize, left: usize, right: usize) -> Result<Self> {
+        if left == 0 && right == 0 {
+            Ok(self.clone())
+        } else if left == 0 {
+            let mut dims = self.dims().to_vec();
+            dims[dim] = right;
+            let right = Self::zeros(dims.as_slice(), self.dtype());
+            Self::cat(&[self, &right], dim)
+        } else if right == 0 {
+            let mut dims = self.dims().to_vec();
+            dims[dim] = left;
+            let left = Self::zeros(dims.as_slice(), self.dtype());
+            Self::cat(&[&left, self], dim)
+        } else {
+            let mut dims = self.dims().to_vec();
+            dims[dim] = left;
+            let left = Self::zeros(dims.as_slice(), self.dtype());
+            dims[dim] = right;
+            let right = Self::zeros(dims.as_slice(), self.dtype());
+            Self::cat(&[&left, self, &right], dim)
+        }
     }
 
     pub fn to_vec0<S: crate::WithDType>(&self) -> Result<S> {
