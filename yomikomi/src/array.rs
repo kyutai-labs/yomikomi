@@ -73,7 +73,7 @@ impl Array {
             let layout = self.layout().narrow(dim, 0, len)?;
             Ok(Self { storage: self.storage.clone(), layout })
         } else {
-            Ok(self.clone())
+            self.pad_with_zeros(dim, 0, len - dims[dim])
         }
     }
 
