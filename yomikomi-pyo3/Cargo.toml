@@ -13,6 +13,6 @@ name = "yomikomi"
 crate-type = ["cdylib"]
 
 [dependencies]
-numpy = "0.22.0"
-pyo3 = "0.22.0"
+numpy = "0.25.0"
+pyo3 = "0.25.0"
 yomikomi = { path = "../yomikomi", version = "0.3.2" }
