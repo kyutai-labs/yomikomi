@@ -65,6 +65,18 @@ impl Array {
         self.reshape(&[self.elem_count()])
     }
 
+    pub fn resize(&self, dim: usize, len: usize) -> Result<Self> {
+        let dims = self.dims();
+        if dims[dim] == len {
+            Ok(self.clone())
+        } else if len < dims[dim] {
+            let layout = self.layout().narrow(dim, 0, len)?;
+            Ok(Self { storage: self.storage.clone(), layout })
+        } else {
+            Ok(self.clone())
+        }
+    }
+
     pub fn narrow(&self, dim: usize, start: usize, len: usize) -> Result<Self> {
         let dims = self.dims();
         let err = |msg| {

@@ -174,11 +174,10 @@ impl<T: Stream> Stream for FirstSlice<T> {
                 None => crate::bail!("no key {} in FirstSlice", self.key),
                 Some(array) => array,
             };
-            let size = array.shape().dims1()?;
-            let mut buffers = self.buffers.lock()?;
             let mut new_sample = sample.clone();
-            let sub_array = array.narrow(0, 0, self.window_size)?;
+            let sub_array = array.resize(0, self.window_size)?;
             new_sample.insert(self.key.to_string(), sub_array);
+            let mut buffers = self.buffers.lock()?;
             buffers.samples.push_back(new_sample);
         }
     }
