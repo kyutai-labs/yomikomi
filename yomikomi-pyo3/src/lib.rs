@@ -1,5 +1,6 @@
+#![allow(clippy::useless_conversion)]
 use numpy::prelude::*;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, BoundObject};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -96,7 +97,9 @@ impl Iterable for Filter {
                             Ok((k.to_string(), v))
                         })
                         .collect::<Result<HashMap<_, _>>>()?
-                        .into_py(py),
+                        .into_pyobject(py)
+                        .map_err(w_py)?
+                        .into_any(),
                     Some(field) => match sample.get(field.as_str()) {
                         Some(value) => array_to_py(value, py)?,
                         None => bail!("Filter cannot find '{}' in sample", field),
@@ -130,7 +133,8 @@ impl Iterable for AndThen {
                         Ok((k.to_string(), v))
                     })
                     .collect::<Result<HashMap<_, _>>>()?
-                    .into_py(py);
+                    .into_pyobject(py)
+                    .map_err(w_py)?;
                 let value = and_then_fn.call1(py, (value,)).map_err(w_py)?;
                 if value.is_none(py) {
                     Ok(None)
@@ -260,6 +264,22 @@ impl Iterable for SlidingWindow {
     }
 }
 
+struct FirstSlice {
+    inner: Arc<dyn Iterable + 'static + Send + Sync>,
+    field: String,
+    window_size: usize,
+}
+
+impl Iterable for FirstSlice {
+    fn iter(&self) -> PyResult<StreamIter> {
+        let inner = self.inner.iter()?.stream;
+        let stream =
+            yk::sliding_window::FirstSlice::new(inner, self.window_size, self.field.clone())
+                .map_err(w)?;
+        Ok(StreamIter { stream: Box::new(stream) })
+    }
+}
+
 struct Batch {
     inner: Arc<dyn Iterable + 'static + Send + Sync>,
     batch_size: usize,
@@ -310,28 +330,29 @@ struct StreamIter {
     stream: Box<dyn Stream + 'static + Send + Sync>,
 }
 
-fn array_to_py(v: &Array, py: Python<'_>) -> Result<PyObject> {
-    fn to_vec<T: WithDType + numpy::Element + ToPyObject>(
+fn array_to_py<'a>(v: &Array, py: Python<'a>) -> Result<Bound<'a, PyAny>> {
+    fn to_vec<'a, T: WithDType + numpy::Element + IntoPyObject<'a>>(
         v: &Array,
-        py: Python<'_>,
-    ) -> Result<PyObject> {
+        py: Python<'a>,
+    ) -> Result<Bound<'a, PyAny>> {
         let v = match v.rank() {
             0 => {
                 // Return scalar values using the built-in types rather than through a num
                 let v = v.to_vec0::<T>()?;
-                v.to_object(py)
+                let obj = v.into_pyobject(py).map_err(|e| Error::wrap(e.into()))?;
+                pyo3::BoundObject::into_any(obj).into_bound()
             }
             1 => {
                 let v = v.to_vec1::<T>()?;
-                numpy::PyArray1::from_vec_bound(py, v).into_py(py)
+                numpy::PyArray1::from_vec(py, v).into_any()
             }
             2 => {
                 let v = v.to_vec2::<T>()?;
-                numpy::PyArray2::from_vec2_bound(py, &v).map_err(Error::wrap)?.into_py(py)
+                numpy::PyArray2::from_vec2(py, &v).map_err(Error::wrap)?.into_any()
             }
             3 => {
                 let v = v.to_vec3::<T>()?;
-                numpy::PyArray3::from_vec3_bound(py, &v).map_err(Error::wrap)?.into_py(py)
+                numpy::PyArray3::from_vec3(py, &v).map_err(Error::wrap)?.into_any()
             }
             r => bail!("unsupported rank for numpy conversion {r}"),
         };
@@ -365,7 +386,7 @@ impl StreamIter {
                 let v = v
                     .into_iter()
                     .map(|(k, v)| {
-                        let v = array_to_py(&v, py)?;
+                        let v = array_to_py(&v, py)?.unbind();
                         Ok((k, v))
                     })
                     .collect::<Result<HashMap<_, _>>>()
@@ -462,6 +483,12 @@ impl YkIterable {
             window_size,
             overlap_over_samples,
         };
+        Ok(Self { inner: Arc::new(inner) })
+    }
+
+    #[pyo3(signature = (window_size, *, field="text".to_string()))]
+    fn first_slice(&self, window_size: usize, field: String) -> PyResult<Self> {
+        let inner = FirstSlice { inner: self.inner.clone(), field, window_size };
         Ok(Self { inner: Arc::new(inner) })
     }
 
@@ -641,37 +668,37 @@ fn py_to_array(py: Python<'_>, value: &PyObject) -> Result<Array> {
     if let Ok(value) = value.downcast_bound::<numpy::PyUntypedArray>(py) {
         let dtype = value.dtype();
         let shape = value.shape();
-        if dtype.is_equiv_to(&numpy::dtype_bound::<u8>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<u8>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<u8>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
             }
         }
-        if dtype.is_equiv_to(&numpy::dtype_bound::<i8>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<i8>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<i8>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
             }
         }
-        if dtype.is_equiv_to(&numpy::dtype_bound::<u32>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<u32>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<u32>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
             }
         }
-        if dtype.is_equiv_to(&numpy::dtype_bound::<i64>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<i64>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<i64>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
             }
         }
-        if dtype.is_equiv_to(&numpy::dtype_bound::<f32>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<f32>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<f32>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
             }
         }
-        if dtype.is_equiv_to(&numpy::dtype_bound::<f64>(py)) {
+        if dtype.is_equiv_to(&numpy::dtype::<f64>(py)) {
             if let Ok(value) = value.downcast_exact::<numpy::PyArrayDyn<f64>>() {
                 let value = value.to_vec().map_err(Error::msg)?;
                 return Array::from(value).reshape(shape);
@@ -751,7 +778,9 @@ impl Iterable for YkPyIterable {
     fn iter(&self) -> PyResult<StreamIter> {
         let iterator = Python::with_gil(|py| {
             let iterable = self.iterable.downcast_bound(py)?;
-            pyo3::types::PyAnyMethods::iter(iterable).map(|v| v.to_object(py))
+            let v =
+                pyo3::types::PyAnyMethods::try_iter(iterable).map(|v| v.into_pyobject(py))??;
+            Ok::<_, PyErr>(v.into_any().unbind())
         })?;
         let stream = YkPyIterator { iterator, field: self.field.clone() };
         Ok(StreamIter { stream: Box::new(stream) })

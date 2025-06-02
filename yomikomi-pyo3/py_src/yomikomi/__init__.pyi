@@ -87,6 +87,10 @@ class YkIterable:
         """ """
         pass
 
+    def first_slice(self, window_size, *, field=...):
+        """ """
+        pass
+
     def key_transform(self, f, *, field):
         """ """
         pass
