@@ -88,10 +88,10 @@ def test_prefetch():
 
 def test_first():
     ds = yk.stream([[c] for c in range(3)], field="foo").first_slice(
-        2, field="foo"
+        2, field="foo", pad_with=42
     )
     values = [d["foo"] for d in ds]
-    np.testing.assert_equal(values, [[0, 0], [1, 0], [2, 0]])
+    np.testing.assert_equal(values, [[0, 42], [1, 42], [2, 42]])
 
 def test_window():
     ds = yk.stream([[c] for c in range(7)], field="foo").sliding_window(
