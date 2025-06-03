@@ -22,7 +22,7 @@ pub use dtype::{DType, WithDType};
 pub use error::{Error, Result};
 pub use layout::Layout;
 pub use shape::Shape;
-pub use storage::Storage;
+pub use storage::{Scalar, Storage};
 pub use stream::{Sample, Stream};
 
 pub(crate) use strided_index::{StridedBlocks, StridedIndex};

@@ -1,4 +1,4 @@
-use crate::{DType, Error, Layout, Result, Shape, Storage};
+use crate::{DType, Error, Layout, Result, Scalar, Shape, Storage};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -65,16 +65,17 @@ impl Array {
         self.reshape(&[self.elem_count()])
     }
 
-    pub fn resize(&self, dim: usize, len: usize) -> Result<Self> {
+    pub fn resize_pad(&self, dim: usize, len: usize, pad_with: Option<f64>) -> Result<Self> {
         let dims = self.dims();
-        if dims[dim] == len {
-            Ok(self.clone())
-        } else if len < dims[dim] {
-            let layout = self.layout().narrow(dim, 0, len)?;
-            Ok(Self { storage: self.storage.clone(), layout })
-        } else {
-            self.pad_with_zeros(dim, 0, len - dims[dim])
-        }
+        let v = match dims[dim].cmp(&len) {
+            std::cmp::Ordering::Equal => self.clone(),
+            std::cmp::Ordering::Greater => {
+                let layout = self.layout().narrow(dim, 0, len)?;
+                Self { storage: self.storage.clone(), layout }
+            }
+            std::cmp::Ordering::Less => self.pad(dim, 0, len - dims[dim], pad_with)?,
+        };
+        Ok(v)
     }
 
     pub fn narrow(&self, dim: usize, start: usize, len: usize) -> Result<Self> {
@@ -115,6 +116,12 @@ impl Array {
     pub fn zeros<S: Into<Shape>>(s: S, dtype: DType) -> Self {
         let shape = s.into();
         let storage = Storage::zeros(shape.elem_count(), dtype);
+        Self { storage: Arc::new(storage), layout: Layout::contiguous(shape) }
+    }
+
+    pub fn full<S: Into<Shape>>(s: S, v: Scalar) -> Self {
+        let shape = s.into();
+        let storage = Storage::full(shape.elem_count(), v);
         Self { storage: Arc::new(storage), layout: Layout::contiguous(shape) }
     }
 
@@ -285,25 +292,39 @@ impl Array {
         Ok(Self { storage: Arc::new(storage), layout: Layout::contiguous(shape) })
     }
 
-    pub fn pad_with_zeros(&self, dim: usize, left: usize, right: usize) -> Result<Self> {
+    pub fn pad(
+        &self,
+        dim: usize,
+        left: usize,
+        right: usize,
+        pad_with: Option<f64>,
+    ) -> Result<Self> {
+        let pad_with = match self.dtype() {
+            DType::U8 => Scalar::U8(pad_with.map_or(0, |v| v as u8)),
+            DType::I8 => Scalar::I8(pad_with.map_or(0, |v| v as i8)),
+            DType::U32 => Scalar::U32(pad_with.map_or(0, |v| v as u32)),
+            DType::I64 => Scalar::I64(pad_with.map_or(0, |v| v as i64)),
+            DType::F32 => Scalar::F32(pad_with.map_or(0., |v| v as f32)),
+            DType::F64 => Scalar::F64(pad_with.unwrap_or(0.)),
+        };
         if left == 0 && right == 0 {
             Ok(self.clone())
         } else if left == 0 {
             let mut dims = self.dims().to_vec();
             dims[dim] = right;
-            let right = Self::zeros(dims.as_slice(), self.dtype());
+            let right = Self::full(dims.as_slice(), pad_with);
             Self::cat(&[self, &right], dim)
         } else if right == 0 {
             let mut dims = self.dims().to_vec();
             dims[dim] = left;
-            let left = Self::zeros(dims.as_slice(), self.dtype());
+            let left = Self::full(dims.as_slice(), pad_with);
             Self::cat(&[&left, self], dim)
         } else {
             let mut dims = self.dims().to_vec();
             dims[dim] = left;
-            let left = Self::zeros(dims.as_slice(), self.dtype());
+            let left = Self::full(dims.as_slice(), pad_with);
             dims[dim] = right;
-            let right = Self::zeros(dims.as_slice(), self.dtype());
+            let right = Self::full(dims.as_slice(), pad_with);
             Self::cat(&[&left, self, &right], dim)
         }
     }

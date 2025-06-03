@@ -143,16 +143,17 @@ pub struct FirstSlice<T> {
     buffers: Mutex<Buffers>,
     key: String,
     window_size: usize,
+    pad_with: Option<f64>,
 }
 
 impl<T> FirstSlice<T> {
-    pub fn new(input: T, window_size: usize, key: String) -> Result<Self> {
+    pub fn new(input: T, window_size: usize, key: String, pad_with: Option<f64>) -> Result<Self> {
         if window_size == 0 {
             crate::bail!("window_size cannot be 0 in FirstSlice");
         };
         let buffers =
             Buffers { samples: VecDeque::new(), arrays: Vec::new(), total_len_in_arrays: 0 };
-        let s = Self { input, buffers: Mutex::new(buffers), key, window_size };
+        let s = Self { input, buffers: Mutex::new(buffers), key, window_size, pad_with };
         Ok(s)
     }
 }
@@ -175,7 +176,7 @@ impl<T: Stream> Stream for FirstSlice<T> {
                 Some(array) => array,
             };
             let mut new_sample = sample.clone();
-            let sub_array = array.resize(0, self.window_size)?;
+            let sub_array = array.resize_pad(0, self.window_size, self.pad_with)?;
             new_sample.insert(self.key.to_string(), sub_array);
             let mut buffers = self.buffers.lock()?;
             buffers.samples.push_back(new_sample);

@@ -43,6 +43,16 @@ pub enum Storage {
     F64(Vec<f64>),
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Scalar {
+    U8(u8),
+    I8(i8),
+    U32(u32),
+    I64(i64),
+    F32(f32),
+    F64(f64),
+}
+
 impl Storage {
     pub fn dtype(&self) -> DType {
         match self {
@@ -82,6 +92,17 @@ impl Storage {
             DType::I64 => Self::I64(vec![0; elem_count]),
             DType::F32 => Self::F32(vec![0.; elem_count]),
             DType::F64 => Self::F64(vec![0.; elem_count]),
+        }
+    }
+
+    pub fn full(elem_count: usize, s: Scalar) -> Self {
+        match s {
+            Scalar::U8(v) => Self::U8(vec![v; elem_count]),
+            Scalar::I8(v) => Self::I8(vec![v; elem_count]),
+            Scalar::U32(v) => Self::U32(vec![v; elem_count]),
+            Scalar::I64(v) => Self::I64(vec![v; elem_count]),
+            Scalar::F32(v) => Self::F32(vec![v; elem_count]),
+            Scalar::F64(v) => Self::F64(vec![v; elem_count]),
         }
     }
 }
