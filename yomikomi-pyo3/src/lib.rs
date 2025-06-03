@@ -268,14 +268,19 @@ struct FirstSlice {
     inner: Arc<dyn Iterable + 'static + Send + Sync>,
     field: String,
     window_size: usize,
+    pad_with: Option<f64>,
 }
 
 impl Iterable for FirstSlice {
     fn iter(&self) -> PyResult<StreamIter> {
         let inner = self.inner.iter()?.stream;
-        let stream =
-            yk::sliding_window::FirstSlice::new(inner, self.window_size, self.field.clone())
-                .map_err(w)?;
+        let stream = yk::sliding_window::FirstSlice::new(
+            inner,
+            self.window_size,
+            self.field.clone(),
+            self.pad_with,
+        )
+        .map_err(w)?;
         Ok(StreamIter { stream: Box::new(stream) })
     }
 }
@@ -486,9 +491,14 @@ impl YkIterable {
         Ok(Self { inner: Arc::new(inner) })
     }
 
-    #[pyo3(signature = (window_size, *, field="text".to_string()))]
-    fn first_slice(&self, window_size: usize, field: String) -> PyResult<Self> {
-        let inner = FirstSlice { inner: self.inner.clone(), field, window_size };
+    #[pyo3(signature = (window_size, *, field="text".to_string(), pad_with=None))]
+    fn first_slice(
+        &self,
+        window_size: usize,
+        field: String,
+        pad_with: Option<f64>,
+    ) -> PyResult<Self> {
+        let inner = FirstSlice { inner: self.inner.clone(), field, window_size, pad_with };
         Ok(Self { inner: Arc::new(inner) })
     }
 
