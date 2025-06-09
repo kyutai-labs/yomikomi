@@ -87,7 +87,7 @@ class YkIterable:
         """ """
         pass
 
-    def first_slice(self, window_size, *, field=...):
+    def first_slice(self, window_size, *, field=..., pad_with=None):
         """ """
         pass
 
