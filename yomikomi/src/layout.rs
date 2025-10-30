@@ -138,11 +138,11 @@ impl Layout {
         Ok(Self { shape, stride, start_offset: self.start_offset })
     }
 
-    pub(crate) fn strided_index(&self) -> crate::StridedIndex {
+    pub(crate) fn strided_index(&self) -> crate::StridedIndex<'_> {
         crate::StridedIndex::from_layout(self)
     }
 
-    pub(crate) fn strided_blocks(&self) -> crate::StridedBlocks {
+    pub(crate) fn strided_blocks(&self) -> crate::StridedBlocks<'_> {
         let mut block_len = 1;
         let mut contiguous_dims = 0; // These are counted from the right.
         for (&stride, &dim) in self.stride().iter().zip(self.dims().iter()).rev() {
