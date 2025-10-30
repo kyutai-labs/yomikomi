@@ -7,6 +7,8 @@ use std::sync::Arc;
 use ::yomikomi as yk;
 use yk::{bail, Array, DType, Error, Result, Stream, WithDType};
 
+const DEFAULT_GIL_BATCH_SIZE: usize = 8;
+
 fn w_py(err: PyErr) -> Error {
     Error::msg(err)
 }
@@ -80,6 +82,70 @@ struct Filter {
     inner: Arc<dyn Iterable + 'static + Send + Sync>,
     filter_fn: Arc<PyObject>,
     field: Option<String>,
+    batch_size: usize,
+}
+
+struct BatchedFilter {
+    inner: Box<dyn Stream + 'static + Send + Sync>,
+    filter_fn: Arc<PyObject>,
+    field: Option<String>,
+    batch_size: usize,
+    buffer: std::sync::Mutex<Vec<yk::Sample>>,
+}
+
+impl Stream for BatchedFilter {
+    fn next(&self) -> Result<Option<yk::Sample>> {
+        loop {
+            {
+                let mut buffer = self.buffer.lock()?;
+                if let Some(sample) = buffer.pop() {
+                    return Ok(Some(sample));
+                }
+            }
+            let mut batch = Vec::new();
+            for _ in 0..self.batch_size {
+                match self.inner.next()? {
+                    Some(sample) => batch.push(sample),
+                    None => break,
+                }
+            }
+            if batch.is_empty() {
+                return Ok(None);
+            }
+            let filtered_samples = Python::with_gil(|py| -> Result<Vec<yk::Sample>> {
+                let mut filtered_samples = Vec::new();
+                for sample in batch {
+                    let value = match self.field.as_ref() {
+                        None => sample
+                            .iter()
+                            .map(|(k, v)| {
+                                let v = array_to_py(v, py)?;
+                                Ok((k.to_string(), v))
+                            })
+                            .collect::<Result<HashMap<_, _>>>()?
+                            .into_pyobject(py)
+                            .map_err(w_py)?
+                            .into_any(),
+                        Some(field) => match sample.get(field.as_str()) {
+                            Some(value) => array_to_py(value, py)?,
+                            None => bail!("Filter cannot find '{}' in sample", field),
+                        },
+                    };
+                    let result = self.filter_fn.call1(py, (value,)).map_err(w_py)?;
+                    if result.is_truthy(py).map_err(w_py)? {
+                        filtered_samples.push(sample);
+                    }
+                }
+                Ok(filtered_samples)
+            })?;
+
+            if !filtered_samples.is_empty() {
+                let mut buffer = self.buffer.lock()?;
+                buffer.extend(filtered_samples.into_iter().rev());
+                return Ok(buffer.pop());
+            }
+        }
+    }
 }
 
 impl Iterable for Filter {
@@ -87,30 +153,16 @@ impl Iterable for Filter {
         let inner = self.inner.iter()?.stream;
         let field = self.field.clone();
         let filter_fn = self.filter_fn.clone();
-        let stream = inner.filter(move |sample| {
-            let value = Python::with_gil(|py| {
-                let value = match field.as_ref() {
-                    None => sample
-                        .iter()
-                        .map(|(k, v)| {
-                            let v = array_to_py(v, py)?;
-                            Ok((k.to_string(), v))
-                        })
-                        .collect::<Result<HashMap<_, _>>>()?
-                        .into_pyobject(py)
-                        .map_err(w_py)?
-                        .into_any(),
-                    Some(field) => match sample.get(field.as_str()) {
-                        Some(value) => array_to_py(value, py)?,
-                        None => bail!("Filter cannot find '{}' in sample", field),
-                    },
-                };
-                let value = filter_fn.call1(py, (value,)).map_err(w_py)?;
-                let value = value.is_truthy(py).map_err(w_py)?;
-                Ok(value)
-            })?;
-            Ok(value)
-        });
+        let batch_size = self.batch_size;
+
+        // Always use batched filtering
+        let stream = BatchedFilter {
+            inner,
+            filter_fn,
+            field,
+            batch_size,
+            buffer: std::sync::Mutex::new(Vec::new()),
+        };
         Ok(StreamIter { stream: Box::new(stream) })
     }
 }
@@ -423,10 +475,13 @@ impl YkIterable {
     /// Filters a stream, the elements are kept if the provided function `f` returns `True` on
     /// them, otherwise they are discarded. If `field` is specified, the function `f` is only
     /// passed the value associated to this field rather than a whole dictionary.
-    #[pyo3(signature = (f, *, field=None))]
-    fn filter(&self, f: PyObject, field: Option<String>) -> PyResult<Self> {
+    /// `gil_batch_size` controls how many samples are processed per GIL acquisition to reduce
+    /// GIL overhead (default: 8).
+    #[pyo3(signature = (f, *, field=None, gil_batch_size=DEFAULT_GIL_BATCH_SIZE))]
+    fn filter(&self, f: PyObject, field: Option<String>, gil_batch_size: usize) -> PyResult<Self> {
         let f = Arc::new(f);
-        let inner = Filter { inner: self.inner.clone(), filter_fn: f, field };
+        let inner =
+            Filter { inner: self.inner.clone(), filter_fn: f, field, batch_size: gil_batch_size };
         Ok(Self { inner: Arc::new(inner) })
     }
 
