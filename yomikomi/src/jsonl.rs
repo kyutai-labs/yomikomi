@@ -227,6 +227,18 @@ impl crate::Stream for FileReader {
                                         }
                                     }
                                 }
+                                serde_json::value::Value::Object(_) => {
+                                    match serde_json::to_string(value) {
+                                        Ok(json_str) => Array::from(json_str.as_bytes().to_vec()),
+                                        Err(err) => {
+                                            eprintln!(
+                                                "{:?}:{line_index} failed to serialize '{field}': {err}",
+                                                self.path
+                                            );
+                                            break 'skip true;
+                                        }
+                                    }
+                                }
                                 _ => continue,
                             };
                             sample.insert(field.to_string(), value);
@@ -253,6 +265,18 @@ impl crate::Stream for FileReader {
                                         (None, None, None) => {
                                             eprintln!(
                                                 "{:?}:{line_index} weird '{field}'",
+                                                self.path
+                                            );
+                                            break 'skip true;
+                                        }
+                                    }
+                                }
+                                Some(serde_json::value::Value::Object(obj)) => {
+                                    match serde_json::to_string(obj) {
+                                        Ok(json_str) => Array::from(json_str.as_bytes().to_vec()),
+                                        Err(err) => {
+                                            eprintln!(
+                                                "{:?}:{line_index} failed to serialize '{field}': {err}",
                                                 self.path
                                             );
                                             break 'skip true;

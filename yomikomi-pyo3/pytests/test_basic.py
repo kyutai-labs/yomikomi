@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 import yomikomi as yk
 
@@ -18,6 +19,7 @@ def test_jsonl():
     assert "".join([chr(c) for c in ds[2]["text"]]) == "this is a text3"
     assert ds[0]["quality"] == 3.14
     assert ds[2]["quality"] == 299792458
+
 
 def test_range():
     ds = yk.stream(range(10), field="foo")
@@ -63,6 +65,7 @@ def test_map():
         ],
     )
 
+
 def test_prefetch():
     ds = yk.stream(range(4), field="foo").prefetch(num_threads=1)
     values = list(ds)
@@ -75,7 +78,11 @@ def test_prefetch():
             {"foo": 3},
         ],
     )
-    ds = yk.stream(range(4), field="foo").filter(lambda x: x % 2 == 1, field="foo").prefetch(num_threads=1)
+    ds = (
+        yk.stream(range(4), field="foo")
+        .filter(lambda x: x % 2 == 1, field="foo")
+        .prefetch(num_threads=1)
+    )
     values = list(ds)
     np.testing.assert_equal(
         values,
@@ -92,6 +99,7 @@ def test_first():
     )
     values = [d["foo"] for d in ds]
     np.testing.assert_equal(values, [[0, 42], [1, 42], [2, 42]])
+
 
 def test_window():
     ds = yk.stream([[c] for c in range(7)], field="foo").sliding_window(
@@ -115,3 +123,35 @@ def test_window():
             [27, 28, 29, 30, 31, 32, 33],
         ],
     )
+
+
+def test_jsonl_with_objects():
+    import json
+
+    pwd = os.path.realpath(__file__)
+    current_dir = os.path.dirname(pwd)
+
+    ds = yk.jsonl(
+        os.path.join(current_dir, "sample_with_objects.jsonl"),
+        field=["text", "scores"],
+    )
+    ds = list(ds)
+
+    assert len(ds) == 3
+
+    # Check first sample
+    assert "".join([chr(c) for c in ds[0]["text"]]) == "sample one"
+
+    # Decode the JSON object from byte array
+    scores0 = json.loads(bytes(ds[0]["scores"]).decode("utf-8"))
+    assert scores0["stem"] == 0.1
+    assert scores0["wiki"] == 0.95
+    assert scores0["hum"] == 0.05
+    assert scores0["rand"] == 0.3
+
+    # Check second sample
+    assert "".join([chr(c) for c in ds[1]["text"]]) == "sample two"
+
+    scores1 = json.loads(bytes(ds[1]["scores"]).decode("utf-8"))
+    assert scores1["stem"] == 0.87
+    assert scores1["wiki"] == 0.13
