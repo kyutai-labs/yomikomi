@@ -1,0 +1,3 @@
+{"text": "sample one", "scores": {"stem": 0.1, "wiki": 0.95, "hum": 0.05, "rand": 0.3}}
+{"text": "sample two", "scores": {"stem": 0.87, "wiki": 0.13, "hum": 0.85, "rand": 0.44}}
+{"text": "sample three", "scores": {"stem": 0.99, "wiki": 0.01, "hum": 0.98, "rand": 0.12}}

@@ -131,3 +131,37 @@ fn sliding_window2() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn jsonl_with_objects() -> Result<()> {
+    let jsonl = yk::jsonl::FileReader::new_multi(
+        "tests/samples_with_objects.jsonl",
+        0,
+        Some(vec!["text".to_string(), "scores".to_string()]),
+        vec![],
+        false,
+    )?;
+    let values = jsonl.collect()?;
+    assert_eq!(values.len(), 3);
+
+    // Check first sample
+    let text0 = values[0].get("text").unwrap().to_vec1::<u8>()?;
+    let text0 = String::from_utf8(text0).unwrap();
+    assert_eq!(text0, "sample one");
+
+    let scores0 = values[0].get("scores").unwrap().to_vec1::<u8>()?;
+    let scores0_str = String::from_utf8(scores0).unwrap();
+    let scores0_json: serde_json::Value = serde_json::from_str(&scores0_str).unwrap();
+    assert_eq!(scores0_json["stem"], 0.1);
+    assert_eq!(scores0_json["wiki"], 0.95);
+    assert_eq!(scores0_json["hum"], 0.05);
+    assert_eq!(scores0_json["rand"], 0.3);
+
+    // Check second sample
+    let scores1 = values[1].get("scores").unwrap().to_vec1::<u8>()?;
+    let scores1_str = String::from_utf8(scores1).unwrap();
+    let scores1_json: serde_json::Value = serde_json::from_str(&scores1_str).unwrap();
+    assert_eq!(scores1_json["stem"], 0.87);
+
+    Ok(())
+}
