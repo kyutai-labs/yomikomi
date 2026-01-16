@@ -165,3 +165,66 @@ fn jsonl_with_objects() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn jsonl_with_arrays() -> Result<()> {
+    let jsonl = yk::jsonl::FileReader::new_multi(
+        "tests/samples_with_arrays.jsonl",
+        0,
+        Some(vec!["text".to_string(), "token_ids".to_string()]),
+        vec![],
+        false,
+    )?;
+    let values = jsonl.collect()?;
+    assert_eq!(values.len(), 2);
+
+    let text0 = values[0].get("text").unwrap().to_vec1::<u8>()?;
+    let text0 = String::from_utf8(text0).unwrap();
+    assert_eq!(text0, "sample one");
+    let tokens0 = values[0].get("token_ids").unwrap().to_vec1::<i64>()?;
+    assert_eq!(tokens0, vec![5, 10, 15, 20, 25]);
+
+    let tokens1 = values[1].get("token_ids").unwrap().to_vec1::<i64>()?;
+    assert_eq!(tokens1, vec![100, 200, 300]);
+
+    Ok(())
+}
+
+#[test]
+fn jsonl_with_float_arrays() -> Result<()> {
+    let jsonl = yk::jsonl::FileReader::new_multi(
+        "tests/samples_with_arrays.jsonl",
+        0,
+        Some(vec!["embeddings".to_string()]),
+        vec![],
+        true,
+    )?;
+    let values = jsonl.collect()?;
+    assert_eq!(values.len(), 2);
+
+    let embeddings = values[1].get("embeddings").unwrap().to_vec1::<f64>()?;
+    assert_eq!(embeddings, vec![0.1, 0.2, 0.3]);
+
+    Ok(())
+}
+
+#[test]
+fn jsonl_with_arrays_all_fields() -> Result<()> {
+    let jsonl = yk::jsonl::FileReader::new_multi(
+        "tests/samples_with_arrays.jsonl",
+        0,
+        None,
+        vec![],
+        false,
+    )?;
+    let values = jsonl.collect()?;
+    assert_eq!(values.len(), 2);
+
+    let tokens0 = values[0].get("token_ids").unwrap().to_vec1::<i64>()?;
+    assert_eq!(tokens0, vec![5, 10, 15, 20, 25]);
+
+    let embeddings = values[1].get("embeddings").unwrap().to_vec1::<f64>()?;
+    assert_eq!(embeddings, vec![0.1, 0.2, 0.3]);
+
+    Ok(())
+}

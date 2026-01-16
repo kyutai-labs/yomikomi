@@ -155,3 +155,51 @@ def test_jsonl_with_objects():
     scores1 = json.loads(bytes(ds[1]["scores"]).decode("utf-8"))
     assert scores1["stem"] == 0.87
     assert scores1["wiki"] == 0.13
+
+
+def test_jsonl_with_arrays():
+    pwd = os.path.realpath(__file__)
+    current_dir = os.path.dirname(pwd)
+
+    ds = yk.jsonl(
+        os.path.join(current_dir, "sample_with_arrays.jsonl"),
+        field=["text", "token_ids"],
+    )
+    ds = list(ds)
+
+    assert len(ds) == 2
+    assert "".join([chr(c) for c in ds[0]["text"]]) == "sample one"
+    np.testing.assert_array_equal(ds[0]["token_ids"], [5, 10, 15, 20, 25])
+    assert ds[0]["token_ids"].dtype == np.int64
+    np.testing.assert_array_equal(ds[1]["token_ids"], [100, 200, 300])
+
+
+def test_jsonl_with_float_arrays():
+    pwd = os.path.realpath(__file__)
+    current_dir = os.path.dirname(pwd)
+
+    ds = yk.jsonl(
+        os.path.join(current_dir, "sample_with_arrays.jsonl"),
+        field=["embeddings"],
+        include_if_missing=True,
+    )
+    ds = list(ds)
+
+    assert len(ds) == 2
+    np.testing.assert_array_almost_equal(ds[1]["embeddings"], [0.1, 0.2, 0.3])
+    assert ds[1]["embeddings"].dtype == np.float64
+
+
+def test_jsonl_with_arrays_all_fields():
+    pwd = os.path.realpath(__file__)
+    current_dir = os.path.dirname(pwd)
+
+    ds = yk.jsonl(
+        os.path.join(current_dir, "sample_with_arrays.jsonl"),
+        field=[],
+    )
+    ds = list(ds)
+
+    assert len(ds) == 2
+    np.testing.assert_array_equal(ds[0]["token_ids"], [5, 10, 15, 20, 25])
+    np.testing.assert_array_almost_equal(ds[1]["embeddings"], [0.1, 0.2, 0.3])
