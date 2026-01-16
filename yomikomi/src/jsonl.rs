@@ -239,6 +239,20 @@ impl crate::Stream for FileReader {
                                         }
                                     }
                                 }
+                                serde_json::value::Value::Array(arr) => {
+                                    let as_i64: Option<Vec<i64>> =
+                                        arr.iter().map(|v| v.as_i64()).collect();
+                                    if let Some(values) = as_i64 {
+                                        Array::from(values)
+                                    } else {
+                                        let as_f64: Option<Vec<f64>> =
+                                            arr.iter().map(|v| v.as_f64()).collect();
+                                        match as_f64 {
+                                            Some(values) => Array::from(values),
+                                            None => continue,
+                                        }
+                                    }
+                                }
                                 _ => continue,
                             };
                             sample.insert(field.to_string(), value);
@@ -280,6 +294,26 @@ impl crate::Stream for FileReader {
                                                 self.path
                                             );
                                             break 'skip true;
+                                        }
+                                    }
+                                }
+                                Some(serde_json::value::Value::Array(arr)) => {
+                                    let as_i64: Option<Vec<i64>> =
+                                        arr.iter().map(|v| v.as_i64()).collect();
+                                    if let Some(values) = as_i64 {
+                                        Array::from(values)
+                                    } else {
+                                        let as_f64: Option<Vec<f64>> =
+                                            arr.iter().map(|v| v.as_f64()).collect();
+                                        match as_f64 {
+                                            Some(values) => Array::from(values),
+                                            None => {
+                                                eprintln!(
+                                                    "{:?}:{line_index} array '{field}' contains non-numeric values",
+                                                    self.path
+                                                );
+                                                break 'skip true;
+                                            }
                                         }
                                     }
                                 }
