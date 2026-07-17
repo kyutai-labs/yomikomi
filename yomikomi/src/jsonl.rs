@@ -109,7 +109,10 @@ impl FileReader {
                 &mut std::io::sink(),
             )?;
             Lines::new(input)
-        } else if path.extension().and_then(|s| s.to_str()) == Some("zstd") {
+        } else if matches!(
+            path.extension().and_then(|s| s.to_str()),
+            Some("zstd") | Some("zst")
+        ) {
             let mut input = zstd::Decoder::new(file).map_err(|e| wrap_err(e, path))?;
             std::io::copy(&mut input.by_ref().take(offset), &mut std::io::sink())?;
             Lines::new(Zstd(std::sync::Mutex::new(input)))

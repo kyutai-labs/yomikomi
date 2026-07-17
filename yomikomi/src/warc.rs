@@ -135,7 +135,10 @@ impl FileReader {
             let input = std::fs::File::open(path).map_err(|e| wrap_err(e, path))?;
             let input = flate2::read::MultiGzDecoder::new(input);
             FileOrCompressed::Gz(input)
-        } else if path.extension().and_then(|s| s.to_str()) == Some("zstd") {
+        } else if matches!(
+            path.extension().and_then(|s| s.to_str()),
+            Some("zstd") | Some("zst")
+        ) {
             let input = std::fs::File::open(path).map_err(|e| wrap_err(e, path))?;
             let input = zstd::Decoder::new(input).map_err(|e| wrap_err(e, path))?;
             FileOrCompressed::Zstd(input)
